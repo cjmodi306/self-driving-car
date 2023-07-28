@@ -331,7 +331,7 @@ coordinates[:,1] = coordinates[:,1]*(1)
 
 
 # vehicle data
-velocity = 50 # m/s
+velocity = 30 # m/s
 vehicle_coordinates = np.array([[-150, 0]])
 yaw_vehicle = -1
 
@@ -349,7 +349,7 @@ y.append(controller._current_y.item())
 #print(controller._current_yaw*180/np.pi)
 
 start=200
-stop = 270
+stop = 250
 for i in range(start, stop):
     crosstrack_distance, min_distance_index = controller.get_min_distance_index(vehicle_coordinates, coordinates)
     print("Iteration: ",i, crosstrack_distance)
@@ -365,8 +365,8 @@ for i in range(start, stop):
 
     controller._set_steer = new_steering_angle
 
-    new_current_x += 0.5*velocity*np.cos(controller._set_steer+controller._current_yaw)
-    new_current_y += 0.5*velocity*np.sin(controller._set_steer+controller._current_yaw)
+    new_current_x += velocity*np.cos(controller._set_steer+controller._current_yaw)
+    new_current_y += velocity*np.sin(controller._set_steer+controller._current_yaw)
 
     # updating controller with the new vehicle coordinates
     controller._current_x = new_current_x
