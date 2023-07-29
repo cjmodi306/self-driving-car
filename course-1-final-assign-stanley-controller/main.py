@@ -46,9 +46,17 @@ class Controller2D(object):
 
     def get_steering_angle(self, crosstrack_distance, yaw_track, min_distance_index):
         # Eliminating yaw difference
+        print("Yaw_track: ", yaw_track*180/np.pi)
+        print("Yaw_vehicle: ", controller._current_yaw*180/np.pi)
+
         yaw_difference = yaw_track-self._current_yaw
+        print("Yaw difference: ", yaw_difference)
+
+        if yaw_difference > np.pi:
+            yaw_difference -= 2*np.pi
+        elif yaw_difference < -np.pi:
+            yaw_difference += 2*np.pi
         steering_angle = yaw_difference
-        
         # Eliminating crosstrack difference
         crosstrack_yaw = np.arctan2(self._current_y-self._waypoints[min_distance_index][1], 
                                     self._current_x-self._waypoints[min_distance_index][0])
@@ -72,7 +80,7 @@ class Controller2D(object):
         
         return steering_angle, yaw_difference
     
-with open("course-1-final-assign-stanley-controller/waypoints.txt") as waypoints_file:
+with open("course-1-final-assign-stanley-controller/ruckweg_coordinates.txt") as waypoints_file:
     waypoints = list(csv.reader(waypoints_file, delimiter=",", quoting=csv.QUOTE_NONNUMERIC))
 
 waypoints_array = np.asarray(waypoints)
@@ -82,9 +90,9 @@ controller = Controller2D(coordinates)
 coordinates = controller.deg2cart(coordinates)
 #print(coordinates)
 # vehicle data
-velocity = 10 # m/s
-vehicle_coordinates = np.array([[-13, -12]])
-yaw_vehicle = np.pi
+velocity = 7 # m/s
+vehicle_coordinates = np.array([[-39, -72]])
+yaw_vehicle = -np.pi
 
 # initializing and passing vehicle data to the controller
 controller._current_x = vehicle_coordinates[:,0]
@@ -100,16 +108,23 @@ y.append(controller._current_y.item())
 #print(controller._current_yaw*180/np.pi)
 
 start=200
-stop = 205
+stop = 450
 
 for i in range(start, stop):
+    print("Iteration: ",i)
     crosstrack_distance, min_distance_index = controller.get_min_distance_index()
+    print("Crosstrack: ", crosstrack_distance)
     yaw_track = controller.get_yaw_track(min_distance_index)
+    #print("Yaw_track: ", yaw_track*180/np.pi)
+    #print("Yaw_vehicle: ", controller._current_yaw*180/np.pi)
+
     new_steering_angle, yaw_difference = controller.get_steering_angle(crosstrack_distance, 
                                                                        yaw_track,
                                                                        min_distance_index)
+    print("Yaw difference: ", yaw_difference*180/np.pi)
 
     controller._set_steer = new_steering_angle
+    print(new_steering_angle*180/np.pi)
 
     new_current_x += velocity*np.cos(controller._set_steer+controller._current_yaw)
     new_current_y += velocity*np.sin(controller._set_steer+controller._current_yaw)
@@ -119,7 +134,6 @@ for i in range(start, stop):
     controller._current_y = new_current_y
     controller._current_yaw = controller._current_yaw + controller._set_steer
     vehicle_coordinates = np.array([[controller._current_x, controller._current_y]])
-    print(vehicle_coordinates)
     x.append(controller._current_x.item())
     y.append(controller._current_y.item())
     print("\n")
