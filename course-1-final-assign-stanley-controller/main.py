@@ -14,23 +14,44 @@ class Controller2D(object):
         self.max_steering        = 1.22
         self.min_steering        = -1.22
 
+    def deg2cart(self, coordinates, interpolate=True):
+        first_row = coordinates[0,:].copy()
+
+        for i in range(coordinates.shape[0]):
+            coordinates[i] = (coordinates[i].copy()-first_row)*111111
         
-    def show_path(self, x, y, color):
-        for i in range(len(x)):
-            plt.plot(x[i], y[i], color, marker=".", markersize=1)
+        if interpolate:
+            x_new = np.linspace(coordinates[0,0], coordinates[-1,0],1000)
+            if x_new[1] < x_new[0]:
+                x_new = -x_new
+                coordinates = -coordinates
+            y_new = np.interp(x_new, coordinates[:,0], coordinates[:,1])
+            #print(y_new)
+            coordinates = np.hstack([-x_new.reshape(-1,1), -y_new.reshape(-1,1)])
+        
+        self._waypoints = coordinates
+
+        return coordinates
     
-    def get_min_distance_index(self, vehicle_coordinates, coordinates):
-        crosstrack_distance = [np.linalg.norm(vehicle_coordinates-coordinates[i]) for i in range(coordinates.shape[0])]
+    def get_min_distance_index(self):
+        vehicle_coordinates = np.array([[self._current_x, self._current_y]])
+        crosstrack_distance = [np.linalg.norm(vehicle_coordinates-self._waypoints[i]) for i in range(self._waypoints.shape[0])]
         min_distance_index = crosstrack_distance.index(min(crosstrack_distance))
-        return np.min(crosstrack_distance)*111139, min_distance_index
-       
-    def get_steering_angle(self, crosstrack_distance, yaw_track, yaw_vehicle, velocity, vehicle_coordinates, track_coordinates):
+        return np.min(crosstrack_distance), min_distance_index
+    
+    def get_yaw_track(self, min_distance_index):
+        yaw_track = np.arctan2(self._waypoints[min_distance_index+1, 1]-self._waypoints[min_distance_index, 1],
+                            self._waypoints[min_distance_index+1, 0]- self._waypoints[min_distance_index, 0]) 
+        return yaw_track
+
+    def get_steering_angle(self, crosstrack_distance, yaw_track, min_distance_index):
         # Eliminating yaw difference
-        yaw_difference = yaw_track-yaw_vehicle
+        yaw_difference = yaw_track-self._current_yaw
         steering_angle = yaw_difference
         
         # Eliminating crosstrack difference
-        crosstrack_yaw = np.arctan2(vehicle_coordinates[:,1]-track_coordinates[1], vehicle_coordinates[:,0]-track_coordinates[0])
+        crosstrack_yaw = np.arctan2(self._current_y-self._waypoints[min_distance_index][1], 
+                                    self._current_x-self._waypoints[min_distance_index][0])
         yaw2ct = yaw_track - crosstrack_yaw
         if yaw2ct < -np.pi:
             yaw2ct += 2*np.pi
@@ -41,7 +62,7 @@ class Controller2D(object):
         else:
             crosstrack_distance = crosstrack_distance
 
-        steering_angle += np.arctan2(crosstrack_distance,velocity)
+        steering_angle += np.arctan2(crosstrack_distance,self._current_speed)
         
         # Limiting the steering angle values
         if steering_angle > self.max_steering:
@@ -56,19 +77,20 @@ with open("course-1-final-assign-stanley-controller/waypoints.txt") as waypoints
 
 waypoints_array = np.asarray(waypoints)
 coordinates = waypoints_array[:,:2]
-coordinates[:,1] = coordinates[:,1]
 
-
+controller = Controller2D(coordinates)
+coordinates = controller.deg2cart(coordinates)
+#print(coordinates)
 # vehicle data
-velocity = 0.00003 # m/s
-vehicle_coordinates = np.array([[49.2429011, 6.9728040]])
-yaw_vehicle = -np.pi/2
+velocity = 10 # m/s
+vehicle_coordinates = np.array([[-13, -12]])
+yaw_vehicle = np.pi
 
 # initializing and passing vehicle data to the controller
-controller = Controller2D(waypoints)
 controller._current_x = vehicle_coordinates[:,0]
 controller._current_y = vehicle_coordinates[:,1]
 controller._current_yaw = yaw_vehicle
+controller._current_speed = velocity
 new_current_x = vehicle_coordinates[:,0].item()
 new_current_y = vehicle_coordinates[:,1].item()
 
@@ -78,19 +100,14 @@ y.append(controller._current_y.item())
 #print(controller._current_yaw*180/np.pi)
 
 start=200
-stop = 220
+stop = 205
+
 for i in range(start, stop):
-    crosstrack_distance, min_distance_index = controller.get_min_distance_index(vehicle_coordinates, coordinates)
-    print("Iteration: ",i, crosstrack_distance)
-    yaw_track = np.arctan2(coordinates[min_distance_index+1, 1]-coordinates[min_distance_index, 1],
-                            coordinates[min_distance_index+1, 0]- coordinates[min_distance_index, 0]) 
-    
+    crosstrack_distance, min_distance_index = controller.get_min_distance_index()
+    yaw_track = controller.get_yaw_track(min_distance_index)
     new_steering_angle, yaw_difference = controller.get_steering_angle(crosstrack_distance, 
-                                                                       yaw_track, 
-                                                                       controller._current_yaw, 
-                                                                       velocity,
-                                                                       vehicle_coordinates,
-                                                                       coordinates[min_distance_index])
+                                                                       yaw_track,
+                                                                       min_distance_index)
 
     controller._set_steer = new_steering_angle
 
@@ -107,11 +124,12 @@ for i in range(start, stop):
     y.append(controller._current_y.item())
     print("\n")
 
+
 xy = np.concatenate((np.asarray(x).reshape(-1,1), np.asarray(y).reshape(-1,1)), axis=1)
 
 plt.plot(coordinates[:,0], coordinates[:,1], 'b', marker='.', markersize=5, label="data_points")
 #plt.plot(vehicle_coordinates[:,0], vehicle_coordinates[:,1], 'r', marker='.', markersize=5, label="data_points")
 plt.plot(xy[:stop,0], xy[:stop,1], 'r', marker='.', markersize=5, label="vehicle_trajectory")
-plt.plot(coordinates[min_distance_index,0], coordinates[min_distance_index,1], 'g', marker='.', markersize=5, label="data_points")
+#plt.plot(coordinates[min_distance_index,0], coordinates[min_distance_index,1], 'g', marker='.', markersize=5, label="data_points")
 plt.legend()
 plt.show()
