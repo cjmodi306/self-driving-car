@@ -79,6 +79,26 @@ class Controller2D(object):
             steering_angle = self.min_steering
         
         return steering_angle, yaw_difference
+
+    def show_vector(self, heading_diff):
+        vector_angle = (np.pi/2)+heading_diff
+        base_vector = np.array([[1, 0]])
+        x_new = base_vector[0,0]*np.cos(vector_angle) - base_vector[0,1]*np.sin(vector_angle)
+        y_new = base_vector[0,0]*np.sin(vector_angle) + base_vector[0,1]*np.cos(vector_angle)
+        transformed_vector = np.array([[x_new, y_new]])
+        print(transformed_vector)
+        tail = [0, 0]
+        fig, ax = plt.subplots(1)
+        ax.quiver(*tail,
+                    transformed_vector[:, 0],
+                    transformed_vector[:, 1],
+                    scale=1,
+                    scale_units='xy',
+                    angles = 'xy',
+                    color=['r'])
+        ax.set_xlim((-1, transformed_vector[:,0].max()+1))
+        ax.set_ylim((-1, transformed_vector[:,1].max()+1))
+        plt.show()
     
 with open("course-1-final-assign-stanley-controller/ruckweg_coordinates.txt") as waypoints_file:
     waypoints = list(csv.reader(waypoints_file, delimiter=",", quoting=csv.QUOTE_NONNUMERIC))
@@ -138,7 +158,8 @@ for i in range(start, stop):
     y.append(controller._current_y.item())
     print("\n")
 
-
+print(yaw_difference*180/np.pi)
+controller.show_vector(yaw_difference)
 xy = np.concatenate((np.asarray(x).reshape(-1,1), np.asarray(y).reshape(-1,1)), axis=1)
 
 plt.plot(coordinates[:,0], coordinates[:,1], 'b', marker='.', markersize=5, label="data_points")
