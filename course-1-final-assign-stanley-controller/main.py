@@ -1,6 +1,8 @@
 import numpy as np
 import csv
 import matplotlib.pyplot as plt
+import cv2
+
 class Controller2D(object):
     def __init__(self, waypoints):
         self._current_x          = 0
@@ -100,6 +102,15 @@ class Controller2D(object):
         ax.set_ylim((-1, transformed_vector[:,1].max()+1))
         plt.show()
     
+    def show_direction(self, heading_diff):
+        image = cv2.imread("arrow.jpg")
+        image_center = tuple(np.array(image.shape[1::-1]) / 2)
+        angle = 90 + ((heading_diff*180)/np.pi)
+        rot_mat = cv2.getRotationMatrix2D(image_center, angle, 1.0)
+        result = cv2.warpAffine(image, rot_mat, image.shape[1::-1], flags=cv2.INTER_LINEAR)
+        cv2.imshow("direction", result)
+        cv2.waitKey(100)
+    
 with open("course-1-final-assign-stanley-controller/ruckweg_coordinates.txt") as waypoints_file:
     waypoints = list(csv.reader(waypoints_file, delimiter=",", quoting=csv.QUOTE_NONNUMERIC))
 
@@ -111,7 +122,7 @@ coordinates = controller.deg2cart(coordinates)
 #print(coordinates)
 # vehicle data
 velocity = 7 # m/s
-vehicle_coordinates = np.array([[-39, -72]])
+vehicle_coordinates = np.array([[-39, -12]])
 yaw_vehicle = -np.pi
 
 # initializing and passing vehicle data to the controller
@@ -128,7 +139,7 @@ y.append(controller._current_y.item())
 #print(controller._current_yaw*180/np.pi)
 
 start=200
-stop = 450
+stop = 238
 
 for i in range(start, stop):
     print("Iteration: ",i)
@@ -156,10 +167,15 @@ for i in range(start, stop):
     vehicle_coordinates = np.array([[controller._current_x, controller._current_y]])
     x.append(controller._current_x.item())
     y.append(controller._current_y.item())
+    plt.plot(coordinates[:,0], coordinates[:,1], 'b', marker='.', markersize=5, label="data_points")
+    plt.plot(x[:stop], y[:stop], 'r', marker='.', markersize=5, label="vehicle_trajectory")
+    plt.legend()
+    #plt.show()
+    controller.show_direction(yaw_difference)
     print("\n")
 
 print(yaw_difference*180/np.pi)
-controller.show_vector(yaw_difference)
+controller.show_direction(yaw_difference)
 xy = np.concatenate((np.asarray(x).reshape(-1,1), np.asarray(y).reshape(-1,1)), axis=1)
 
 plt.plot(coordinates[:,0], coordinates[:,1], 'b', marker='.', markersize=5, label="data_points")
