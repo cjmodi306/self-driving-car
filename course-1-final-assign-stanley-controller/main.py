@@ -2,6 +2,8 @@ import numpy as np
 import csv
 import matplotlib.pyplot as plt
 import cv2
+from pyproj import Transformer
+import sys
 
 class Controller2D(object):
     def __init__(self, waypoints):
@@ -12,14 +14,14 @@ class Controller2D(object):
         self._desired_speed      = 0
         self._set_brake          = 0
         self._set_steer          = 0
-        self._waypoints          = waypoints
+        self._waypoints          = self.deg2cart(waypoints)/100
         self.max_steering        = 1.22
         self.min_steering        = -1.22
 
     def deg2cart(self, coordinates, interpolate=True):
         first_row = coordinates[0,:].copy()
 
-        for i in range(coordinates.shape[0]):
+        '''for i in range(coordinates.shape[0]):
             coordinates[i] = (coordinates[i].copy()-first_row)*111111
         
         if interpolate:
@@ -30,13 +32,21 @@ class Controller2D(object):
             y_new = np.interp(x_new, coordinates[:,0], coordinates[:,1])
             #print(y_new)
             coordinates = np.hstack([-x_new.reshape(-1,1), -y_new.reshape(-1,1)])
-        
-        self._waypoints = coordinates
+        '''
+        gps2cart = Transformer.from_crs(4979, 4978,always_xy=True)
+        cartesian_coordinates = coordinates.copy()
 
-        return coordinates
+        for i in range(coordinates.shape[0]):
+            # .transform(longitude, latitude, 0)
+            #print(gps2cart.transform(coordinates[i,0], coordinates[i,1], 0)[:])
+            cartesian_coordinates[i] = gps2cart.transform(coordinates[i,0], coordinates[i,1], 0)[:2]
+        
+        self._waypoints = cartesian_coordinates
+
+        return cartesian_coordinates
     
     def get_min_distance_index(self):
-        vehicle_coordinates = np.array([[self._current_x, self._current_y]])
+        vehicle_coordinates = np.array([self._current_x, self._current_y])
         crosstrack_distance = [np.linalg.norm(vehicle_coordinates-self._waypoints[i]) for i in range(self._waypoints.shape[0])]
         min_distance_index = crosstrack_distance.index(min(crosstrack_distance))
         return np.min(crosstrack_distance), min_distance_index
@@ -111,35 +121,36 @@ class Controller2D(object):
         cv2.imshow("direction", result)
         cv2.waitKey(100)
     
-with open("course-1-final-assign-stanley-controller/ruckweg_coordinates.txt") as waypoints_file:
+with open("course-1-final-assign-stanley-controller/local_coordinates.txt") as waypoints_file:
     waypoints = list(csv.reader(waypoints_file, delimiter=",", quoting=csv.QUOTE_NONNUMERIC))
 
 waypoints_array = np.asarray(waypoints)
 coordinates = waypoints_array[:,:2]
 
 controller = Controller2D(coordinates)
-coordinates = controller.deg2cart(coordinates)
-#print(coordinates)
+coordinates = controller._waypoints
 # vehicle data
 velocity = 7 # m/s
-vehicle_coordinates = np.array([[-39, -12]])
+vehicle_coordinates = np.array([[controller._waypoints[0,0], controller._waypoints[0,1]]])
 yaw_vehicle = -np.pi
 
 # initializing and passing vehicle data to the controller
-controller._current_x = vehicle_coordinates[:,0]
-controller._current_y = vehicle_coordinates[:,1]
+controller._current_x = vehicle_coordinates[:,0].item()
+controller._current_y = vehicle_coordinates[:,1].item()
+print(controller._current_x, controller._current_y)
 controller._current_yaw = yaw_vehicle
 controller._current_speed = velocity
 new_current_x = vehicle_coordinates[:,0].item()
 new_current_y = vehicle_coordinates[:,1].item()
 
+
 x,y = [],[]
-x.append(controller._current_x.item())
-y.append(controller._current_y.item())
+x.append(controller._current_x)
+y.append(controller._current_y)
 #print(controller._current_yaw*180/np.pi)
 
 start=200
-stop = 238
+stop = 498
 
 for i in range(start, stop):
     print("Iteration: ",i)
@@ -165,22 +176,15 @@ for i in range(start, stop):
     controller._current_y = new_current_y
     controller._current_yaw = controller._current_yaw + controller._set_steer
     vehicle_coordinates = np.array([[controller._current_x, controller._current_y]])
-    x.append(controller._current_x.item())
-    y.append(controller._current_y.item())
-    plt.plot(coordinates[:,0], coordinates[:,1], 'b', marker='.', markersize=5, label="data_points")
-    plt.plot(x[:stop], y[:stop], 'r', marker='.', markersize=5, label="vehicle_trajectory")
-    plt.legend()
-    #plt.show()
-    controller.show_direction(yaw_difference)
+    x.append(controller._current_x)
+    y.append(controller._current_y)
     print("\n")
+    #sys.exit()
 
-print(yaw_difference*180/np.pi)
-controller.show_direction(yaw_difference)
 xy = np.concatenate((np.asarray(x).reshape(-1,1), np.asarray(y).reshape(-1,1)), axis=1)
 
+
 plt.plot(coordinates[:,0], coordinates[:,1], 'b', marker='.', markersize=5, label="data_points")
-#plt.plot(vehicle_coordinates[:,0], vehicle_coordinates[:,1], 'r', marker='.', markersize=5, label="data_points")
 plt.plot(xy[:stop,0], xy[:stop,1], 'r', marker='.', markersize=5, label="vehicle_trajectory")
-#plt.plot(coordinates[min_distance_index,0], coordinates[min_distance_index,1], 'g', marker='.', markersize=5, label="data_points")
 plt.legend()
 plt.show()
