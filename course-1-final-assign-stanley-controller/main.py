@@ -19,31 +19,15 @@ class Controller2D(object):
         self.min_steering        = -1.22
 
     def deg2cart(self, coordinates, interpolate=True):
-        first_row = coordinates[0,:].copy()
-
-        '''for i in range(coordinates.shape[0]):
-            coordinates[i] = (coordinates[i].copy()-first_row)*111111
-        
-        if interpolate:
-            x_new = np.linspace(coordinates[0,0], coordinates[-1,0],1000)
-            if x_new[1] < x_new[0]:
-                x_new = -x_new
-                coordinates = -coordinates
-            y_new = np.interp(x_new, coordinates[:,0], coordinates[:,1])
-            #print(y_new)
-            coordinates = np.hstack([-x_new.reshape(-1,1), -y_new.reshape(-1,1)])
-        '''
         gps2cart = Transformer.from_crs(4979, 4978,always_xy=True)
         cartesian_coordinates = coordinates.copy()
 
         for i in range(coordinates.shape[0]):
-            # .transform(longitude, latitude, 0)
-            #print(gps2cart.transform(coordinates[i,0], coordinates[i,1], 0)[:])
             cartesian_coordinates[i] = gps2cart.transform(coordinates[i,0], coordinates[i,1], 0)[:2]
         
         self._waypoints = cartesian_coordinates
 
-        return cartesian_coordinates
+        return cartesian_coordinates*1000
     
     def get_min_distance_index(self):
         vehicle_coordinates = np.array([self._current_x, self._current_y])
@@ -62,12 +46,14 @@ class Controller2D(object):
         print("Yaw_vehicle: ", controller._current_yaw*180/np.pi)
 
         yaw_difference = yaw_track-self._current_yaw
-        print("Yaw difference: ", yaw_difference)
+        print("Yaw difference in radians: ", yaw_difference)
 
         if yaw_difference > np.pi:
             yaw_difference -= 2*np.pi
         elif yaw_difference < -np.pi:
             yaw_difference += 2*np.pi
+        
+        print("Corrected Yaw difference in degrees: ", yaw_difference*180/np.pi)
         steering_angle = yaw_difference
         # Eliminating crosstrack difference
         crosstrack_yaw = np.arctan2(self._current_y-self._waypoints[min_distance_index][1], 
@@ -121,7 +107,7 @@ class Controller2D(object):
         cv2.imshow("direction", result)
         cv2.waitKey(100)
     
-with open("course-1-final-assign-stanley-controller/local_coordinates.txt") as waypoints_file:
+with open("local_coordinates.txt") as waypoints_file:
     waypoints = list(csv.reader(waypoints_file, delimiter=",", quoting=csv.QUOTE_NONNUMERIC))
 
 waypoints_array = np.asarray(waypoints)
@@ -130,9 +116,10 @@ coordinates = waypoints_array[:,:2]
 controller = Controller2D(coordinates)
 coordinates = controller._waypoints
 # vehicle data
-velocity = 7 # m/s
+velocity = 30 # m/s
 vehicle_coordinates = np.array([[controller._waypoints[0,0], controller._waypoints[0,1]]])
 yaw_vehicle = -np.pi
+print(vehicle_coordinates)
 
 # initializing and passing vehicle data to the controller
 controller._current_x = vehicle_coordinates[:,0].item()
@@ -149,12 +136,15 @@ x.append(controller._current_x)
 y.append(controller._current_y)
 #print(controller._current_yaw*180/np.pi)
 
-start=200
-stop = 498
+start=0
+stop = 538
 
 for i in range(start, stop):
     print("Iteration: ",i)
+    velocity = 35
     crosstrack_distance, min_distance_index = controller.get_min_distance_index()
+    if crosstrack_distance>10:
+        velocity *= 0.5
     print("Crosstrack: ", crosstrack_distance)
     yaw_track = controller.get_yaw_track(min_distance_index)
     #print("Yaw_track: ", yaw_track*180/np.pi)
@@ -167,9 +157,13 @@ for i in range(start, stop):
 
     controller._set_steer = new_steering_angle
     print(new_steering_angle*180/np.pi)
+    print(new_current_x, new_current_y)
 
     new_current_x += velocity*np.cos(controller._set_steer+controller._current_yaw)
     new_current_y += velocity*np.sin(controller._set_steer+controller._current_yaw)
+
+    print(new_current_x, new_current_y)
+    print(coordinates[i,0], coordinates[i,1])
 
     # updating controller with the new vehicle coordinates
     controller._current_x = new_current_x
@@ -187,4 +181,6 @@ xy = np.concatenate((np.asarray(x).reshape(-1,1), np.asarray(y).reshape(-1,1)), 
 plt.plot(coordinates[:,0], coordinates[:,1], 'b', marker='.', markersize=5, label="data_points")
 plt.plot(xy[:stop,0], xy[:stop,1], 'r', marker='.', markersize=5, label="vehicle_trajectory")
 plt.legend()
+#plt.xlim([41415, 41425])
+#plt.ylim([5090, 5060])
 plt.show()
